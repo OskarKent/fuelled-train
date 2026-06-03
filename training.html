@@ -970,6 +970,28 @@ function importBackup(){
   if(!txt){alert('Paste your backup text first.');return;}
   try{
     const data=JSON.parse(txt);
+
+    // Detect Fuelled backup (v2 format with users.rob)
+    if(data.version===2&&data.users&&data.users.rob){
+      const robCustoms=data.users.rob.customs||[];
+      const robFavs=data.users.rob.favs||[];
+      const importedFoods=robCustoms.filter(f=>!f._deleted);
+      const importedFavs=robFavs;
+      if(!confirm('This looks like a Fuelled backup.\n\nImport '+importedFoods.length+' custom food(s) and '+importedFavs.length+' favourite(s) from Rob\'s profile?'))return;
+      // Merge customs
+      const names=new Set(importedFoods.map(f=>f.name));
+      customs=customs.filter(f=>!names.has(f.name)).concat(importedFoods);
+      lss('tr_customs',customs);FOOD_DB=buildDB();filtered=[...FOOD_DB];
+      // Merge favs
+      const favNames=new Set(importedFavs.map(f=>f.name));
+      favs=favs.filter(f=>!favNames.has(f.name)).concat(importedFavs);
+      lss('tr_favs',favs);
+      closeSheet('sheet-backup');renderAll();showSaved();
+      alert('Imported '+importedFoods.length+' custom food(s) and '+importedFavs.length+' favourite(s) from Fuelled.');
+      return;
+    }
+
+    // Native Training backup
     if(!confirm('Restore all data from this backup? Current data will be overwritten.'))return;
     if(data.session){sessionLog=data.session;MEAL_IDS.forEach(id=>{if(!sessionLog[id])sessionLog[id]=[];});lss('tr_session',sessionLog);}
     if(data.favs){favs=data.favs;lss('tr_favs',favs);}
