@@ -341,6 +341,10 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;over
     <div style="font-size:10px;color:var(--muted);margin-bottom:10px;font-family:'Barlow Condensed',sans-serif;letter-spacing:1px">CARBS G &nbsp;&nbsp; PROTEIN G &nbsp;&nbsp; (leave blank = no target)</div>
     <div id="meal-target-inputs"></div>
     <div class="divider"></div>
+    <div class="sgrp" style="color:#47c4ff">Easy Day — Per Meal</div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:10px;font-family:'Barlow Condensed',sans-serif;letter-spacing:1px">CARBS G &nbsp;&nbsp; PROTEIN G &nbsp;&nbsp; (leave blank = no target)</div>
+    <div id="easy-meal-target-inputs"></div>
+    <div class="divider"></div>
     <div class="sgrp">Easy Day — Daily Total</div>
     <div class="row3">
       <div class="field"><label>Calories</label><input id="s-ec" type="number" inputmode="numeric"></div>
@@ -402,6 +406,13 @@ const DEFAULT_MEAL_TGTS = {
   lunch:              {carb:100, prot:40},
   snack:              {carb:100, prot:35}
 };
+const DEFAULT_EASY_MEAL_TGTS = {
+  prev_dinner:        {carb:null, prot:null},
+  pre_run:            {carb:null, prot:null},
+  post_run_breakfast: {carb:null, prot:null},
+  lunch:              {carb:null, prot:null},
+  snack:              {carb:null, prot:null}
+};
 
 function todayKey(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function dateKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
@@ -421,6 +432,8 @@ let flatTgts  = lsg('tr_flat_tgts',DEFAULT_FLAT);
 ['easy','rest'].forEach(t=>{if(!flatTgts[t])flatTgts[t]={...DEFAULT_FLAT[t]};});
 let mealTgts  = lsg('tr_meal_tgts',DEFAULT_MEAL_TGTS);
 MEALS.forEach(m=>{if(!mealTgts[m.id])mealTgts[m.id]={...DEFAULT_MEAL_TGTS[m.id]};});
+let easyMealTgts = lsg('tr_easy_meal_tgts',DEFAULT_EASY_MEAL_TGTS);
+MEALS.forEach(m=>{if(!easyMealTgts[m.id])easyMealTgts[m.id]={...DEFAULT_EASY_MEAL_TGTS[m.id]};});
 let sessionLog = lsg('tr_session',{});
 MEAL_IDS.forEach(id=>{if(!sessionLog[id])sessionLog[id]=[];});
 let flatLog   = lsg('tr_flat_'+todayKey(),[]);
@@ -508,23 +521,21 @@ function renderSession(){
     const mP=entries.reduce((a,e)=>a+e.protein,0);
     const mCal=entries.reduce((a,e)=>a+e.cal,0);
     // Only show targets on session days
-    const showTgts=isSess;
-    const mt=mealTgts[meal.id]||{};
+    const showTgts=true;
+    const mt=(dayType==='easy'?easyMealTgts:mealTgts)[meal.id]||{};
     const carbTgt=mt.carb||null;
     const protTgt=mt.prot||null;
-    const cPct=showTgts&&carbTgt?pct(mC,carbTgt):0;
-    const pPct=showTgts&&protTgt?pct(mP,protTgt):0;
-    const tgtStr=showTgts
-      ? [carbTgt?carbTgt+'g carbs':null,protTgt?protTgt+'g protein':null].filter(Boolean).join(' \u00b7 ')||'informational'
-      : 'informational';
+    const cPct=carbTgt?pct(mC,carbTgt):0;
+    const pPct=protTgt?pct(mP,protTgt):0;
+    const tgtStr=[carbTgt?carbTgt+'g carbs':null,protTgt?protTgt+'g protein':null].filter(Boolean).join(' \u00b7 ')||'informational';
 
     const calDisplay='<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:700;color:var(--cal);margin-top:1px">'+rnd(mCal)+' kcal</div>';
 
-    const carbBlock=showTgts&&carbTgt
+    const carbBlock=carbTgt
       ? '<div><div class="mp-label">Carbs</div><div class="mp-vals"><span class="mp-val" style="color:var(--carb)">'+rnd(mC)+'g</span><span class="mp-tgt">/ '+carbTgt+'g</span></div><div class="bar-track"><div class="bar-fill '+(cPct>=100?'bover':'bcarb')+'" style="width:'+cPct+'%"></div></div></div>'
       : '<div><div class="mp-label">Carbs</div><div class="mp-vals"><span class="mp-val" style="color:var(--carb)">'+rnd(mC)+'g</span></div></div>';
 
-    const protBlock=showTgts&&protTgt
+    const protBlock=protTgt
       ? '<div><div class="mp-label">Protein</div><div class="mp-vals"><span class="mp-val" style="color:var(--prot)">'+rnd(mP)+'g</span><span class="mp-tgt">/ '+protTgt+'g</span></div><div class="bar-track"><div class="bar-fill '+(pPct>=100?'bover':'bprot')+'" style="width:'+pPct+'%"></div></div></div>'
       : '<div><div class="mp-label">Protein</div><div class="mp-vals"><span class="mp-val" style="color:var(--prot)">'+rnd(mP)+'g</span></div></div>';
 
@@ -900,15 +911,18 @@ function deleteEditFood(){
 
 // Settings
 function openSettings(){
-  // Render meal target inputs dynamically
-  document.getElementById('meal-target-inputs').innerHTML=MEALS.map(m=>{
-    const mt=mealTgts[m.id]||{};
-    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'+
-      '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:700;letter-spacing:.5px;color:'+m.color+';width:120px;flex-shrink:0">'+m.label+'</div>'+
-      '<input type="number" inputmode="numeric" placeholder="carbs" value="'+(mt.carb!=null?mt.carb:'')+'" id="mt-c-'+m.id+'" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:15px;color:var(--text);font-family:\'Barlow\',sans-serif;outline:none;">'+
-      '<input type="number" inputmode="numeric" placeholder="prot" value="'+(mt.prot!=null?mt.prot:'')+'" id="mt-p-'+m.id+'" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:15px;color:var(--text);font-family:\'Barlow\',sans-serif;outline:none;">'+
-    '</div>';
-  }).join('');
+  const renderMealInputs=(containerId,tgts,prefix)=>{
+    document.getElementById(containerId).innerHTML=MEALS.map(m=>{
+      const mt=tgts[m.id]||{};
+      return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'+
+        '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:700;letter-spacing:.5px;color:'+m.color+';width:120px;flex-shrink:0">'+m.label+'</div>'+
+        '<input type="number" inputmode="numeric" placeholder="carbs" value="'+(mt.carb!=null?mt.carb:'')+'" id="'+prefix+'-c-'+m.id+'" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:15px;color:var(--text);font-family:\'Barlow\',sans-serif;outline:none;">'+
+        '<input type="number" inputmode="numeric" placeholder="prot" value="'+(mt.prot!=null?mt.prot:'')+'" id="'+prefix+'-p-'+m.id+'" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:15px;color:var(--text);font-family:\'Barlow\',sans-serif;outline:none;">'+
+      '</div>';
+    }).join('');
+  };
+  renderMealInputs('meal-target-inputs', mealTgts, 'mt');
+  renderMealInputs('easy-meal-target-inputs', easyMealTgts, 'em');
   document.getElementById('s-ec').value=flatTgts.easy.cal;
   document.getElementById('s-ep').value=flatTgts.easy.protein;
   document.getElementById('s-ecb').value=flatTgts.easy.carbs||200;
@@ -919,13 +933,17 @@ function openSettings(){
 }
 function saveSettings(){
   const g=id=>parseFloat(document.getElementById(id).value);
-  // Save meal targets
-  MEALS.forEach(m=>{
-    const c=document.getElementById('mt-c-'+m.id).value.trim();
-    const p=document.getElementById('mt-p-'+m.id).value.trim();
-    mealTgts[m.id]={carb:c!==''?parseFloat(c):null, prot:p!==''?parseFloat(p):null};
-  });
+  const readMealInputs=(tgts,prefix)=>{
+    MEALS.forEach(m=>{
+      const c=document.getElementById(prefix+'-c-'+m.id).value.trim();
+      const p=document.getElementById(prefix+'-p-'+m.id).value.trim();
+      tgts[m.id]={carb:c!==''?parseFloat(c):null, prot:p!==''?parseFloat(p):null};
+    });
+  };
+  readMealInputs(mealTgts,'mt');
   lss('tr_meal_tgts',mealTgts);
+  readMealInputs(easyMealTgts,'em');
+  lss('tr_easy_meal_tgts',easyMealTgts);
   flatTgts={
     easy:{cal:g('s-ec')||flatTgts.easy.cal,protein:g('s-ep')||flatTgts.easy.protein,carbs:g('s-ecb')||200},
     rest:{cal:g('s-rc')||flatTgts.rest.cal,protein:g('s-rp')||flatTgts.rest.protein,carbs:g('s-rcb')||150}
@@ -935,7 +953,7 @@ function saveSettings(){
 
 // Backup
 function openBackup(){
-  const today=new Date(),data={version:1,exported:new Date().toISOString(),session:sessionLog,favs,customs,flatTgts,mealTgts,history:{},flatHistory:{}};
+  const today=new Date(),data={version:1,exported:new Date().toISOString(),session:sessionLog,favs,customs,flatTgts,mealTgts,easyMealTgts,history:{},flatHistory:{}};
   for(let i=0;i<14;i++){
     const d=new Date(today);d.setDate(d.getDate()-i);const k=dateKey(d);
     const s=lsg('tr_session_hist_'+k,null),f=lsg('tr_flat_'+k,null);
@@ -998,6 +1016,7 @@ function importBackup(){
     if(data.customs){customs=data.customs;lss('tr_customs',customs);FOOD_DB=buildDB();filtered=[...FOOD_DB];}
     if(data.flatTgts){flatTgts=data.flatTgts;lss('tr_flat_tgts',flatTgts);}
     if(data.mealTgts){mealTgts=data.mealTgts;lss('tr_meal_tgts',mealTgts);}
+    if(data.easyMealTgts){easyMealTgts=data.easyMealTgts;lss('tr_easy_meal_tgts',easyMealTgts);}
     if(data.history)Object.entries(data.history).forEach(([k,v])=>lss('tr_session_hist_'+k,v));
     if(data.flatHistory)Object.entries(data.flatHistory).forEach(([k,v])=>lss('tr_flat_'+k,v));
     closeSheet('sheet-backup');renderAll();showSaved();
