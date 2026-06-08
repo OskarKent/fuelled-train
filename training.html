@@ -385,6 +385,8 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;over
       <button class="btn-o" onclick="copyBackup()">Copy</button>
       <button class="btn-p" onclick="importBackup()">Import</button>
     </div>
+    <div class="divider"></div>
+    <button class="ghost-btn" style="width:100%" onclick="exportFoodsJson()">&#128196; Export new foods for foods.json</button>
   </div>
 </div>
 
@@ -968,6 +970,22 @@ function saveSettings(){
 }
 
 // Backup
+function exportFoodsJson(){
+  const exportable=customs.filter(f=>!f._deleted&&!f._deleted).map(f=>{
+    // Strip internal flags, output clean food object
+    if(f.unit==='each') return {name:f.name,unit:'each',cal_u:f.cal_u,prot_u:f.prot_u,carbs_u:f.carbs_u};
+    return {name:f.name,unit:'g',cal100:f.cal100,prot100:f.prot100,carbs100:f.carbs100};
+  });
+  if(!exportable.length){
+    alert('No custom foods to export — add some via + Add food in the Foods tab first.');
+    return;
+  }
+  const txt=exportable.map(f=>JSON.stringify(f)).join(',\n');
+  document.getElementById('backup-text').value=txt;
+  document.getElementById('backup-lbl').textContent=exportable.length+' food(s) ready to paste into foods.json';
+  document.getElementById('backup-count').textContent='Open foods.json on GitHub \u2192 edit \u2192 paste these lines inside the [ ] array \u2192 commit';
+}
+
 function openBackup(){
   const today=new Date(),data={version:1,exported:new Date().toISOString(),session:sessionLog,favs,customs,flatTgts,mealTgts,easyMealTgts,history:{},flatHistory:{}};
   for(let i=0;i<14;i++){
