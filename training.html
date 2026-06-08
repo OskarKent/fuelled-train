@@ -123,6 +123,8 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;over
 .favs-scroll{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;padding:0 18px 20px;}
 .favs-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .fav-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;cursor:pointer;transition:all .12s;position:relative;user-select:none;}
+.fav-meal-tabs{display:flex;gap:6px;padding:0 18px 10px;flex-wrap:wrap;flex-shrink:0;}
+.fav-meal-tab{padding:5px 10px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;white-space:nowrap;}
 .fav-card:active{background:var(--surface2);transform:scale(.97);}
 .fav-name{font-weight:600;font-size:13px;margin-bottom:2px;line-height:1.2;padding-right:14px;}
 .fav-portion{font-size:11px;color:var(--muted);margin-bottom:6px;}
@@ -275,6 +277,7 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;over
 
   <div class="view hidden" id="view-favs">
     <div class="sec-hdr"><span class="sec-title">Tap to log</span></div>
+    <div class="fav-meal-tabs" id="fav-meal-tabs"></div>
     <div class="favs-scroll"><div class="favs-grid" id="favs-grid"></div></div>
   </div>
 
@@ -441,12 +444,14 @@ let favs      = lsg('tr_favs',[]);
 let customs   = lsg('tr_customs',[]);
 let FOOD_DB   = buildDB();
 let filtered  = [...FOOD_DB];
-let activeFood=null, activeMeal='prev_dinner', editFoodOrig=null, editUnit='g';
+let activeFood=null, activeMeal='prev_dinner', activeFavMeal='prev_dinner', editFoodOrig=null, editUnit='g';
 let editLogId=null, editLogMeal=null;
 let savedTimer=null;
 
+let FOOD_DB_BASE = FOOD_DB_DEFAULT; // overridden by foods.json fetch on init
+
 function buildDB(){
-  const base=FOOD_DB_DEFAULT.map(f=>({...f,custom:false}));
+  const base=FOOD_DB_BASE.map(f=>({...f,custom:false}));
   const ov={};
   customs.filter(f=>!f._deleted&&!f._new).forEach(f=>{ov[f._origName||f.name]=f;});
   const nf=customs.filter(f=>f._new&&!f._deleted);
@@ -477,6 +482,7 @@ function setTab(t){
   });
   if(t==='foods')setTimeout(()=>document.getElementById('food-search').focus(),150);
   if(t==='history')renderHistory();
+  if(t==='favs')renderFavMealTabs();
 }
 
 function setDayType(t){dayType=t;lss('tr_daytype',t);renderAll();}
@@ -493,7 +499,7 @@ function renderAll(){
   document.getElementById('flat-log-wrap').classList.toggle('hidden',isMeal);
   document.getElementById('reset-btn').classList.toggle('hidden',isRest);
   if(isMeal){renderSession();}else{renderFlatMacros();renderFlatLog();}
-  renderFoodList();renderFavs();
+  renderFoodList();renderFavs();renderFavMealTabs();
 }
 
 // Session
@@ -736,6 +742,16 @@ function removeSessionEntry(mealId,entryId){
 function removeFlatEntry(id){flatLog=flatLog.filter(e=>e.id!==id);lss('tr_flat_'+todayKey(),flatLog);renderAll();}
 function clearFlatLog(){if(!confirm("Clear today's log?"))return;flatLog=[];lss('tr_flat_'+todayKey(),flatLog);renderAll();}
 
+// Favs meal tabs
+function renderFavMealTabs(){
+  document.getElementById('fav-meal-tabs').innerHTML=MEALS.map(m=>
+    '<button class="fav-meal-tab'+(activeFavMeal===m.id?' active':'')+'" '+
+    'style="'+(activeFavMeal===m.id?'background:'+m.color+';border-color:'+m.color+';color:#000':'')+'" '+
+    'onclick="setFavMeal(\''+m.id+'\')">'+m.label+'</button>'
+  ).join('');
+}
+function setFavMeal(id){activeFavMeal=id;renderFavMealTabs();}
+
 // Favs
 function renderFavs(){
   const fg=document.getElementById('favs-grid');
@@ -757,7 +773,7 @@ function renderFavs(){
 function logFav(id){
   const f=favs.find(x=>x.id===id);if(!f)return;
   const entry={id:Date.now()+'',name:f.name,portion:f.portion,cal:f.cal,protein:f.protein,carbs:f.carbs||0,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})};
-  if(dayType==='session'||dayType==='easy'){sessionLog[activeMeal||'prev_dinner'].push(entry);lss('tr_session',sessionLog);}
+  if(dayType==='session'||dayType==='easy'){sessionLog[activeFavMeal].push(entry);lss('tr_session',sessionLog);}
   else{flatLog.push(entry);lss('tr_flat_'+todayKey(),flatLog);}
   showSaved();setTab('log');renderAll();
 }
@@ -1037,7 +1053,11 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Escape')['sheet-food','sheet-edit','sheet-settings','sheet-backup'].forEach(closeSheet);
 });
 
-renderAll();
+(async function init(){
+  try{const r=await fetch('./foods.json');if(r.ok)FOOD_DB_BASE=await r.json();}catch(e){}
+  FOOD_DB=buildDB();filtered=[...FOOD_DB];
+  renderAll();
+})();
 
 </script>
 </body>
